@@ -27,6 +27,13 @@ const SEED: Item[] = [
   { id: crypto.randomUUID(), codigo: "PC-4400", nome: "Perfil pintado preto fosco 6m", categoria: "Perfis", quantidade: 128, unidade: "barra", minimo: 50, preco: 61.3, local: "Galpão 1, fileira D" },
 ];
 
+// ---------- Sessão / permissões ----------
+
+const sessao = OlgaAuth.exigirLogin();
+// exigirLogin() já redireciona para login.html quando não há sessão.
+// A partir daqui, "sessao" está sempre presente em tempo de execução.
+const role: OlgaAuth.Role = sessao ? sessao.role : "funcionario";
+
 // ---------- Estado ----------
 
 let itens: Item[] = [];
@@ -87,6 +94,26 @@ const kpiTotalItens = document.getElementById("kpiTotalItens") as HTMLElement;
 const kpiTotalUnidades = document.getElementById("kpiTotalUnidades") as HTMLElement;
 const kpiValorTotal = document.getElementById("kpiValorTotal") as HTMLElement;
 const kpiBaixoEstoque = document.getElementById("kpiBaixoEstoque") as HTMLElement;
+
+const userNome = document.getElementById("userNome") as HTMLElement;
+const userRoleEl = document.getElementById("userRole") as HTMLElement;
+const btnSair = document.getElementById("btnSair") as HTMLButtonElement;
+const btnUsuarios = document.getElementById("btnUsuarios") as HTMLButtonElement;
+
+const overlayUsuarios = document.getElementById("overlayUsuarios") as HTMLDivElement;
+const drawerUsuarios = document.getElementById("drawerUsuarios") as HTMLDivElement;
+const btnCloseUsuarios = document.getElementById("btnCloseUsuarios") as HTMLButtonElement;
+const userList = document.getElementById("userList") as HTMLDivElement;
+const formUsuario = document.getElementById("formUsuario") as HTMLFormElement;
+const userFormTitle = document.getElementById("userFormTitle") as HTMLHeadingElement;
+const userFormError = document.getElementById("userFormError") as HTMLParagraphElement;
+const btnCancelUsuario = document.getElementById("btnCancelUsuario") as HTMLButtonElement;
+const uId = document.getElementById("uId") as HTMLInputElement;
+const uNome = document.getElementById("uNome") as HTMLInputElement;
+const uUsuario = document.getElementById("uUsuario") as HTMLInputElement;
+const uSenha = document.getElementById("uSenha") as HTMLInputElement;
+const uSenhaHint = document.getElementById("uSenhaHint") as HTMLElement;
+const uRole = document.getElementById("uRole") as HTMLSelectElement;
 
 // ---------- Formatação ----------
 
@@ -184,7 +211,9 @@ function renderTabela(): void {
       <td data-label="Total" class="num">${fmtMoeda(item.preco * item.quantidade)}</td>
       <td data-label="Ações">
         <div class="row-actions">
-          <button class="icon-btn" data-action="editar" data-id="${item.id}" type="button">Editar</button>
+          <button class="icon-btn" data-action="editar" data-id="${item.id}" type="button">
+            ${OlgaAuth.podeEditarItens(role) ? "Editar" : "Ver"}
+          </button>
         </div>
       </td>
     `;
@@ -216,8 +245,10 @@ function escapeHtml(s: string): string {
 
 function abrirDrawer(item?: Item): void {
   form.reset();
+  const podeEditar = OlgaAuth.podeEditarItens(role);
+
   if (item) {
-    drawerTitle.textContent = "Editar item";
+    drawerTitle.textContent = podeEditar ? "Editar item" : "Detalhes do item";
     fId.value = item.id;
     fCodigo.value = item.codigo;
     fNome.value = item.nome;
@@ -227,12 +258,20 @@ function abrirDrawer(item?: Item): void {
     fMinimo.value = String(item.minimo);
     fPreco.value = String(item.preco);
     fLocal.value = item.local ?? "";
-    btnDelete.hidden = false;
+    btnDelete.hidden = !(podeEditar && OlgaAuth.podeExcluirItens(role));
   } else {
+    if (!podeEditar) return;
     drawerTitle.textContent = "Novo item";
     fId.value = "";
     btnDelete.hidden = true;
   }
+
+  [fCodigo, fNome, fCategoria, fQuantidade, fUnidade, fMinimo, fPreco, fLocal].forEach((campo) => {
+    campo.disabled = !podeEditar;
+  });
+  const btnSalvar = form.querySelector("button[type='submit']") as HTMLButtonElement;
+  btnSalvar.hidden = !podeEditar;
+
   overlay.hidden = false;
   drawer.classList.add("open");
   drawer.setAttribute("aria-hidden", "false");
@@ -367,9 +406,157 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && drawer.classList.contains("open")) fecharDrawer();
 });
 
+// ---------- Sessão / topbar ----------
+
+function aplicarPermissoesNaTela(): void {
+  if (!sessao) return;
+  userNome.textContent = sessao.nome;
+  userRoleEl.textContent = OlgaAuth.ROLE_LABEL[sessao.role];
+  userRoleEl.dataset.role = sessao.role;
+
+  btnNew.hidden = !OlgaAuth.podeEditarItens(role);
+  btnExport.hidden = !OlgaAuth.podeExportar(role);
+  btnUsuarios.hidden = !OlgaAuth.podeGerenciarUsuarios(role);
+}
+
+btnSair.addEventListener("click", () => {
+  OlgaAuth.logout();
+  window.location.replace("login.html");
+});
+
+// ---------- Painel de usuários (admin) ----------
+
+function fecharDrawerUsuarios(): void {
+  drawerUsuarios.classList.remove("open");
+  drawerUsuarios.setAttribute("aria-hidden", "true");
+  overlayUsuarios.hidden = true;
+}
+
+function limparFormUsuario(): void {
+  formUsuario.reset();
+  uId.value = "";
+  userFormTitle.textContent = "Novo usuário";
+  uSenha.required = true;
+  uSenhaHint.textContent = "Mínimo 4 caracteres.";
+  userFormError.hidden = true;
+}
+
+async function renderUsuarios(): Promise<void> {
+  const lista = await OlgaAuth.listarUsuarios();
+  userList.innerHTML = "";
+
+  lista
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+    .forEach((u) => {
+      const row = document.createElement("div");
+      row.className = "user-row";
+      row.innerHTML = `
+        <div class="user-row-info">
+          <span class="user-row-nome">${escapeHtml(u.nome)}</span>
+          <span class="user-row-meta">@${escapeHtml(u.usuario)} · ${OlgaAuth.ROLE_LABEL[u.role]}</span>
+        </div>
+        <div class="row-actions">
+          <button class="icon-btn" data-action="editar-usuario" data-id="${u.id}" type="button">Editar</button>
+          <button class="icon-btn" data-action="excluir-usuario" data-id="${u.id}" type="button">Excluir</button>
+        </div>
+      `;
+      userList.appendChild(row);
+    });
+}
+
+async function abrirDrawerUsuarios(): Promise<void> {
+  limparFormUsuario();
+  await renderUsuarios();
+  overlayUsuarios.hidden = false;
+  drawerUsuarios.classList.add("open");
+  drawerUsuarios.setAttribute("aria-hidden", "false");
+}
+
+btnUsuarios.addEventListener("click", abrirDrawerUsuarios);
+btnCloseUsuarios.addEventListener("click", fecharDrawerUsuarios);
+overlayUsuarios.addEventListener("click", fecharDrawerUsuarios);
+btnCancelUsuario.addEventListener("click", limparFormUsuario);
+
+userList.addEventListener("click", async (e) => {
+  const target = e.target as HTMLElement;
+  const btn = target.closest("button[data-id]") as HTMLButtonElement | null;
+  if (!btn) return;
+  const id = btn.dataset.id as string;
+  const acao = btn.dataset.action;
+
+  if (acao === "editar-usuario") {
+    const lista = await OlgaAuth.listarUsuarios();
+    const u = lista.find((x) => x.id === id);
+    if (!u) return;
+    uId.value = u.id;
+    uNome.value = u.nome;
+    uUsuario.value = u.usuario;
+    uSenha.value = "";
+    uSenha.required = false;
+    uSenhaHint.textContent = "Deixe em branco para manter a senha atual.";
+    uRole.value = u.role;
+    userFormTitle.textContent = `Editar usuário — ${u.nome}`;
+    userFormError.hidden = true;
+  }
+
+  if (acao === "excluir-usuario") {
+    if (id === sessao?.userId) {
+      mostrarToast("Você não pode excluir o próprio usuário logado.");
+      return;
+    }
+    if (!confirm("Excluir este usuário?")) return;
+    const resultado = await OlgaAuth.excluirUsuario(id);
+    if (!resultado.ok) {
+      mostrarToast(resultado.erro || "Não foi possível excluir.");
+      return;
+    }
+    await renderUsuarios();
+    mostrarToast("Usuário excluído.");
+  }
+});
+
+formUsuario.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  userFormError.hidden = true;
+
+  if (uSenha.required && uSenha.value.length < 4) {
+    userFormError.textContent = "A senha deve ter ao menos 4 caracteres.";
+    userFormError.hidden = false;
+    return;
+  }
+  if (uSenha.value && uSenha.value.length < 4) {
+    userFormError.textContent = "A senha deve ter ao menos 4 caracteres.";
+    userFormError.hidden = false;
+    return;
+  }
+
+  const dados = {
+    usuario: uUsuario.value,
+    nome: uNome.value,
+    role: uRole.value as OlgaAuth.Role,
+  };
+
+  const resultado = uId.value
+    ? await OlgaAuth.atualizarUsuario(uId.value, { ...dados, senha: uSenha.value || undefined })
+    : await OlgaAuth.criarUsuario({ ...dados, senha: uSenha.value });
+
+  if (!resultado.ok) {
+    userFormError.textContent = resultado.erro || "Não foi possível salvar.";
+    userFormError.hidden = false;
+    return;
+  }
+
+  mostrarToast(uId.value ? "Usuário atualizado." : "Usuário cadastrado.");
+  limparFormUsuario();
+  await renderUsuarios();
+  aplicarPermissoesNaTela();
+});
+
 // ---------- Inicialização ----------
 
 function iniciar(): void {
+  aplicarPermissoesNaTela();
   itens = carregar();
   atualizarCategorias();
   renderTabela();
