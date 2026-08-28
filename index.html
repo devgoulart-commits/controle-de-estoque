@@ -11,6 +11,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="auth.js"></script>
+<script>
+  // Guarda de sessão: se não houver usuário logado, volta para a tela de login
+  // antes de o conteúdo da página ser desenhado.
+  if (!OlgaAuth.sessaoAtual()) {
+    window.location.replace("login.html");
+  }
+</script>
 </head>
 <body>
 
@@ -31,6 +39,12 @@
   <div class="topbar-actions">
     <button class="btn btn-ghost" id="btnExport" type="button">Exportar CSV</button>
     <button class="btn btn-primary" id="btnNew" type="button">+ Novo item</button>
+    <button class="btn btn-ghost" id="btnUsuarios" type="button" hidden>Usuários</button>
+    <div class="user-chip">
+      <span class="user-chip-name" id="userNome"></span>
+      <span class="user-chip-role" id="userRole"></span>
+    </div>
+    <button class="btn btn-ghost" id="btnSair" type="button">Sair</button>
   </div>
 </header>
 
@@ -151,6 +165,54 @@
       <div class="spacer"></div>
       <button type="button" class="btn btn-ghost" id="btnCancel">Cancelar</button>
       <button type="submit" class="btn btn-primary">Salvar</button>
+    </div>
+  </form>
+</aside>
+
+<div class="drawer-overlay" id="overlayUsuarios" hidden></div>
+<aside class="drawer" id="drawerUsuarios" aria-hidden="true">
+  <div class="drawer-head">
+    <h2>Usuários</h2>
+    <button type="button" class="btn-close" id="btnCloseUsuarios" aria-label="Fechar">×</button>
+  </div>
+
+  <div class="user-list" id="userList"></div>
+
+  <form id="formUsuario" class="user-form">
+    <h3 id="userFormTitle">Novo usuário</h3>
+    <input type="hidden" id="uId">
+
+    <label class="field">
+      <span>Nome completo</span>
+      <input type="text" id="uNome" class="input" required>
+    </label>
+
+    <label class="field">
+      <span>Usuário (login)</span>
+      <input type="text" id="uUsuario" class="input" required autocomplete="off">
+    </label>
+
+    <label class="field">
+      <span>Senha</span>
+      <input type="password" id="uSenha" class="input" autocomplete="new-password">
+      <small class="field-hint" id="uSenhaHint">Mínimo 4 caracteres.</small>
+    </label>
+
+    <label class="field">
+      <span>Função</span>
+      <select id="uRole" class="input select">
+        <option value="funcionario">Funcionário — só visualiza o estoque</option>
+        <option value="gerente">Gerente — cadastra, edita e exporta</option>
+        <option value="admin">Administrador — acesso total</option>
+      </select>
+    </label>
+
+    <p class="login-error" id="userFormError" hidden></p>
+
+    <div class="drawer-actions">
+      <button type="button" class="btn btn-ghost" id="btnCancelUsuario">Limpar</button>
+      <div class="spacer"></div>
+      <button type="submit" class="btn btn-primary">Salvar usuário</button>
     </div>
   </form>
 </aside>
