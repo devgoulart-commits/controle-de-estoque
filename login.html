@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar — Olga Alumínio</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="login-body">
+
+<div class="rail"></div>
+
+<main class="login-wrap">
+  <section class="login-card">
+    <div class="brand brand-center">
+      <svg class="brand-mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="4" y="10" width="40" height="7" rx="1.5" fill="currentColor"/>
+        <rect x="4" y="20.5" width="40" height="7" rx="1.5" fill="currentColor" opacity="0.65"/>
+        <rect x="4" y="31" width="40" height="7" rx="1.5" fill="currentColor" opacity="0.35"/>
+      </svg>
+      <div class="brand-text">
+        <h1>OLGA <span>ALUMÍNIO</span></h1>
+        <p>Controle de Estoque</p>
+      </div>
+    </div>
+
+    <form id="loginForm" novalidate>
+      <label class="field">
+        <span>Usuário</span>
+        <input type="text" id="fUsuario" class="input" autocomplete="username" required autofocus>
+      </label>
+      <label class="field">
+        <span>Senha</span>
+        <input type="password" id="fSenha" class="input" autocomplete="current-password" required>
+      </label>
+
+      <p class="login-error" id="loginError" hidden></p>
+
+      <button type="submit" class="btn btn-primary btn-block" id="btnEntrar">Entrar</button>
+    </form>
+
+    <div class="login-hint">
+      <span class="login-hint-title">Acessos de demonstração</span>
+      <ul>
+        <li><strong>Administrador</strong> — usuário <code>admin</code> · senha <code>admin123</code></li>
+        <li><strong>Gerente</strong> — usuário <code>gerente</code> · senha <code>gerente123</code></li>
+        <li><strong>Funcionário</strong> — usuário <code>funcionario</code> · senha <code>func123</code></li>
+      </ul>
+      <p>Altere essas senhas no painel de usuários assim que possível.</p>
+    </div>
+  </section>
+</main>
+
+<script src="auth.js"></script>
+<script>
+  (function () {
+    if (OlgaAuth.sessaoAtual()) {
+      window.location.replace("index.html");
+    }
+  })();
+
+  const form = document.getElementById("loginForm");
+  const erro = document.getElementById("loginError");
+  const btn = document.getElementById("btnEntrar");
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    erro.hidden = true;
+    btn.disabled = true;
+    btn.textContent = "Entrando…";
+
+    const usuario = document.getElementById("fUsuario").value;
+    const senha = document.getElementById("fSenha").value;
+    const resultado = await OlgaAuth.login(usuario, senha);
+
+    if (resultado.ok) {
+      window.location.replace("index.html");
+    } else {
+      erro.textContent = resultado.erro || "Não foi possível entrar.";
+      erro.hidden = false;
+      btn.disabled = false;
+      btn.textContent = "Entrar";
+    }
+  });
+</script>
+</body>
+</html>
